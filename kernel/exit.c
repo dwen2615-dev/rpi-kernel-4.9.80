@@ -60,6 +60,9 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+/* CS596 Project 3 */
+extern void rsv_cleanup_task(struct task_struct *p);
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -779,6 +782,11 @@ void __noreturn do_exit(long code)
 	 * Ensure that all new tsk->pi_lock acquisitions must observe
 	 * PF_EXITING. Serializes against futex.c:attach_to_pi_owner().
 	 */
+	
+  	/* CS596 Project 3: cleanup per-task CPU reservation (if any) */
+    	extern void rsv_cleanup_task(struct task_struct *);
+	rsv_cleanup_task(tsk);
+	
 	smp_mb();
 	/*
 	 * Ensure that we must observe the pi_state in exit_mm() ->

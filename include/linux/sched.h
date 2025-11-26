@@ -62,6 +62,9 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+/* CS596 Project 3: Forward declaration */
+struct rsv_info;
+
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
 /*
@@ -326,7 +329,7 @@ extern char ___assert_task_state[1 - 2*!!(
 extern rwlock_t tasklist_lock;
 extern spinlock_t mmlist_lock;
 
-struct task_struct;
+struct Stask_struct;
 
 #ifdef CONFIG_PROVE_RCU
 extern int lockdep_tasklist_lock_is_held(void);
@@ -1699,6 +1702,9 @@ struct task_struct {
 /* signal handlers */
 	struct signal_struct *signal;
 	struct sighand_struct *sighand;
+
+	/* Project 3: reservation pointer */
+	struct rsv_info *rsv;
 
 	sigset_t blocked, real_blocked;
 	sigset_t saved_sigmask;	/* restored if set_restore_sigmask() was used */

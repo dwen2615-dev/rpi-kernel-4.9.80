@@ -2551,6 +2551,9 @@ static int dl_overflow(struct task_struct *p, int policy,
 
 extern void init_dl_bw(struct dl_bw *dl_b);
 
+extern void rsv_on_switch_out(struct task_struct *p);
+extern void rsv_on_switch_in(struct task_struct *p);
+
 /*
  * wake_up_new_task - wake up a newly created task for the first time.
  *
@@ -3394,12 +3397,19 @@ static void __sched notrace __schedule(bool preempt)
 	rq->clock_skip_update = 0;
 
 	if (likely(prev != next)) {
-		rq->nr_switches++;
+		/* 4.5: record sched-in time on outgoing task */
+		rsv_on_switch_out(prev);
+
+                rq->nr_switches++;
 		rq->curr = next;
 		++*switch_count;
 
 		trace_sched_switch(preempt, prev, next);
-		rq = context_switch(rq, prev, next, cookie); /* unlocks the rq */
+		
+		/* 4.5: record sched-in time on incoming task */
+		rsv_on_switch_in(next);
+
+                rq = context_switch(rq, prev, next, cookie); /* unlocks the rq */
 	} else {
 		lockdep_unpin_lock(&rq->lock, cookie);
 		raw_spin_unlock_irq(&rq->lock);
