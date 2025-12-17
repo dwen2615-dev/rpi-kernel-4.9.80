@@ -1,0 +1,4 @@
+obj-y += rsv_syscalls.o
+obj-y += rsv_sched.o
+obj-y += rsv_core.o
+obj-y += rsv_chain.o

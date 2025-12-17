@@ -406,9 +406,10 @@
 		CALL(sys_pkey_mprotect)
 /* 395 */	CALL(sys_pkey_alloc)
 		CALL(sys_pkey_free)
-/* 397 */       CALL(sys_set_rsv)
+/* 397 */	CALL(sys_set_edf_task)
 /* 398 */	CALL(sys_cancel_rsv)
 /* 399 */	CALL(sys_wait_until_next_period)
+/* 400 */	CALL(sys_get_e2e_latency)
 #ifndef syscalls_counted
 .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
 #define syscalls_counted
