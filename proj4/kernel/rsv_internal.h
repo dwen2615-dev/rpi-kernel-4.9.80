@@ -32,16 +32,6 @@ struct chain_latency_info {
 
 /*
  * Per-task reservation / EDF state.
- *
- * Project 3 fields are kept (C, T, active, timer, wq, lock, waiting,
- * next_release, accum_time, sched_in_time, budget_exhausted).
- *
- * Project 4 (4.1) adds:
- *   - D        : relative deadline (D == T per spec)
- *   - cpu_id   : which CPU this task is pinned to
- *   - chain_id : processing chain ID
- *   - chain_pos: position within the chain
- *   - period_start, abs_deadline: EDF timing for current job
  */
 struct rsv_info {
     /* 4.1 / 4.2: basic reservation parameters + EDF metadata */
@@ -90,15 +80,3 @@ void rsv_reassign_rt_prios(void);
 
 /* Cleanup hook used from do_exit() */
 void rsv_cleanup_task(struct task_struct *p);
-
-
-
-
-
-
-
-
-
-
-
-

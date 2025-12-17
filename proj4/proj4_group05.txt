@@ -1,0 +1,45 @@
+Group 05
+
+Dan, Kane, Alf
+
+Q1. What is the difference between partitioned and global multi-processor scheduling? What are the pros and cons of each?
+
+Partitioned and global scheduling are two two fundamentally different approaches to managing real-time tasks across multiple processors. WIth partitioned scheduling, each task is statically assigned to a specific CPU core upon system initialization and remains bound to said core for its entire lifetime,
+with each processor running its own independent scheduler. Contrasting that, global scheduling has all tasks share a single system-wide ready queue, and the M highest-priority tasks are selected to run on the M available processors at any given time. Partitioned scheduling is generally simpler to implement, 
+avoids task migration overhead, and allows pre-existing single-processor schedulability analysis to apply directly to each partition. However, it does have a major flaw in the bin-packing problem of assigning tasks to cores being NP-hard, and a poor partition can imbalancedly leave one core overloaded while 
+another is idle. Global scheduling allows better load balancing and can often schedule task sets that partitioned scheduling cannot, but it introduces significant synchronization complexity for the shared ready queue, alongside task migrations causing cache invalidation, and theoretical utilization bounds 
+being often lower. Overall, the main difference is partitioned assigning each task to a single CPU, while global allows for any task to run on any available CPU. For this project, we implemented partitioned EDF because it is simpler and allows us to leverage single-processor EDF optimality on each core independently. 
+
+Q2. Explain your task partitioning strategy. List which tasks you assigned to Core 0 and Core 1, and show that the utilization on each core is <= 1.0
+
+We implemented First Fit Decreasing (FFD) bin-packing to partition the 9 tasks across 2 CPU cores. FFD sorts tasks by utilization in descending order, then assigns each task to the first core that can accommodate it without exceeding 100% utilization. The taskset that was given consists of: Task 0 (C=17ms, T=100ms, 
+U=0.170), Task 1 (C=12ms, T=200ms, U=0.060), Task 2 (C=23ms, T=50ms, U=0.460), Task 3 (C=25ms, T=150ms, U=0.167), Task 4 (C=17ms, T=100ms, U=0.170), Task 5 (C=42ms, T=500ms, U=0.084), Task 6 (C=30ms, T=300ms, U=0.100), Task 7 (C=28ms, T=100ms, U=0.280), and Task 8 (C=42ms, T=200ms, U=0.210). After sorting by utilization 
+and applying FFD, CPU 0 received Tasks 2, 7, and 8 with total utilization 0.950, while CPU 1 received Tasks 0, 4, 3, 6, 5, and 1 with total utilization 0.751. Thus both cores have a clear utilization <= 1.0, meaning the partition is valid and schedulable under EDF. 
+
+Q3. Please measure the overhead of your EDF scheduling implementation in the Kernel space? Was it acceptable?
+
+The primary overhead in our EDF implementation comes from the rsv_reassign_rt_prios() function, which is called whenever task priorities need to be recalculated. This function iterates through all active reservations using for_each_process_thread(), compares absolute deadlines, and calls sched_setscheduler_nocheck() 
+to update priorities. Using dmesg timestamps, we observed that rsv_reassign_rt_prios() typically completes in under 0.1ms. Given the fact that our shortest task period is 50ms, this overhead represents only 0.2% of the smallest period. Additional overhead sources include hrtimer callbacks for period boundaries 
+(~10-50 microseconds) and wait_until_next_period() syscall overhead (~5-20 microseconds). Overall, the total scheduling overhead is well under 1ms per period, which is pretty acceptable for task periods ranging from 50ms to 500ms in our taskset.
+
+
+Q4. How did you implement the e2e latency measurement? Specifically, where in the kernel are the start and end times captured, and how did you handle synchronization between cores?
+
+My understanding of end-to-end latency measurement was tracking the time from when the first task in a chain (pos=0) starts a job until the last task in the chain (pos=2) completes its job. It was implemented using a global chain_latency_info structure for each of the 3 chains. In wait_until_next_period(), 
+after the pos=0 task wakes up from sleeping (indicating a new job is beginning), we call chain_record_start(chain_id) which captures the current time using ktime_get() and stores it with a start_valid flag. Before the pos=2 task goes to sleep, we call chain_record_end(chain_id) which calculates latency as 
+now minus start_time and updates min/max/sum/count statistics. Since tasks in a chain may run on different CPU cores, we protect the chain_latency_info structure with a spinlock acquired during every read or write operation. When cancel_rsv() is called on a pos=2 task, chain_print_stats() outputs the minimum, 
+maximum, and average latency for that chain to dmesg. Additionally, syscall 400 (get_e2e_latency) allows user-space programs to retrieve the most recent e2e latency for a given chain_id.
+
+
+Q5. What issues did you face for this project and how did yous resolve them?
+
+Several significant issues arose during development. Undoubtedly the most time consuming one was the implementation of syscall 397, where the given project specifications shown explicitly 7 parameters, it was impossible for rpi 4.9.80 and in the pursuit of attempting to change it, several hours were spent 
+modifying the kernel in an attempt to bypass the 6 parameter limit. This was resolved by using a pointer to put some parameters into a struct, which was first believed to be against project instructions before clarification from the professor. Otherwise, there were many more issues. First, when switching 
+from for_each_process() to for_each_process_thread(g, p) to iterate over all threads, we encountered compilation errors because the kernel uses C89 style requiring all variable declarations at the top of the function block, which we fixed by declaring both g and p at the function beginning. Second, for_each_process() 
+only iterates over process leaders, not individual threads, causing rsv_reassign_rt_prios() to never find tasks with reservations since our EDF tasks were created as pthreads; we resolved this by using for_each_process_thread(g, p). Third, the ARM architecture doesn't support native 64-bit division, causing undefined 
+reference to __aeabi_ldivmod errors, which we fixed by using do_div() from <asm/div64.h> with u64 types. Fourth, when cancelling a reservation, threads blocked in wait_until_next_period() would never wake up, causing the loader to hang; we fixed this by adding wake_up_all(&ri->wq) in cancel_rsv() before freeing the 
+structure. Fifth, after adding syscall 400, the kernel failed to build due to syscall table size mismatch, which we resolved by updating __NR_syscalls from 400 to 404. Finally, we attempted chain-aware scheduling for extra credit by boosting the deadline of the next task in a chain when the current task finishes, 
+but observed inconsistent results with extreme latency spikes on some runs, so we reverted to the stable baseline implementation. Overall, this project was significantly more challenging on the technical front, likely due to increased familiarity with the pi and vm workflow. Especially helpful was setting up SSHing, 
+which prevented the need to reflash the pi over and over as was necessary for project 3.
+
+
